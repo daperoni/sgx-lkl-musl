@@ -25,6 +25,7 @@
 #include <sys/prctl.h>
 
 #include <enclave/enclave_oe.h>
+#include <sys/time.h>
 
 static void error(const char *, ...);
 
@@ -1849,6 +1850,10 @@ void __dls3(elf64_stack_t *stack, void *tos)
 	char **argv = stack->argv;
 	char **envp = stack->envp;
 
+	long long secs_used, nanos_used;
+    	struct timespec start, end;
+
+
 	auxv = libc.auxv;
 	decode_vec(auxv, aux, AUX_CNT);
 
@@ -1864,7 +1869,16 @@ void __dls3(elf64_stack_t *stack, void *tos)
 		_exit(1);
 	}
 	errno = 0;
+	
+	clock_gettime(CLOCK_MONOTONIC, &start);
 	Ehdr *ehdr = (void *)map_library(fd, &app);
+
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	secs_used=(end.tv_sec - start.tv_sec); //avoid overflow by subtracting first
+	nanos_used= ((secs_used*1000000000) + end.tv_nsec) - (start.tv_nsec);
+	SGXLKL_VERBOSE("\nTime taken to create enclave=%ld ms\n\n", (nanos_used/1000000));
+
+
 	if (!ehdr) {
 		if (errno)
 			sgxlkl_error("Failed to map %s: %s\n", argv[0], strerror(errno));
